@@ -6,3 +6,5 @@
 - **Java 기반 TDD 예제**: `AccountTest.java`와 같은 테스트 코드를 통해 TDD의 기본 개념을 연습할 수 있습니다.
 - 테스트 케이스가 실제 코드 작성에 어떤 영향을 주는지, 리팩토링 과정에서 테스트의 역할이 어떻게 변화하는지를 학습할 수 있습니다.
 
+## 블로그 링크
+https://k-jyun.tistory.com/entry/%EA%B0%9D%EC%B2%B4%EC%A7%80%ED%96%A5-TDD
