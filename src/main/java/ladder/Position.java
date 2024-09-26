@@ -8,6 +8,10 @@ public class Position {
         this.position = position;
     }
 
+    public int getValue() {
+        return position;
+    }
+
     public int getPosition() {
         return position;
     }

@@ -53,6 +53,8 @@ public class Row {
 
     private boolean isLineAtNextPosition(Position startPosition) {
         startPosition.next();
-        return !nodes[startPosition.getPosition()].isAlreadysetDirection();
+        boolean isLineAtPosition = !nodes[startPosition.getPosition()].isAlreadysetDirection();
+        startPosition.prev();
+        return isLineAtPosition;
     }
 }
