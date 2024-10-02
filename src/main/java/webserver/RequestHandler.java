@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -39,22 +40,22 @@ public class RequestHandler implements Runnable{
 
 
 
-            // 회원가입 요청 처리
+            // GET 방식으로 회원가입 요청 처리
             if (path.startsWith("/user/signup") && method.equals("GET")) { //서버 경로로 설정해야함
-                Map<String, String> queryParams = parseQueryParams(path);
+                Map<String, String> queryParams = parseGETQueryParams(path);
 
-                // 사용자 정보를 메모리 리포지토리에 저장
+                // 사용자 정보 저장
                 String userId = queryParams.get("userId");
                 String password = queryParams.get("password");
                 String name = queryParams.get("name");
                 String email = queryParams.get("email");
 
-                log.log(Level.INFO, "New Client Request: " + method + " " + path + " " + userId);
+                log.log(Level.INFO, "사용자 정보: " + method + " " + path + " " + userId);
 
                 if (userId != null && name != null && password != null) {
                     User newUser = new User(userId, password, name, email);
                     MemoryUserRepository.getInstance().addUser(newUser);
-                    log.log(Level.INFO, "User registered: " + newUser);
+                    log.log(Level.INFO, "사용자: " + newUser);
                 }
 
                 // 회원가입 후 index.html 반환
@@ -67,22 +68,22 @@ public class RequestHandler implements Runnable{
 
             //POST 방식으로 로그인
             if (method.equals("POST") && path.startsWith("/user/signup")) {
-                log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
-                log.log(Level.INFO, "ddddddd");
+                log.log(Level.INFO, "경로: " + path);  // 경로 출력
                 Map<String, String> postData = getPostData(br);
 
-                log.log(Level.INFO, "qqqqqqq");
                 String userId = postData.get("userId");
-                String password = postData.get("password");
+                log.log(Level.INFO, "유저ID: " + userId);
 
-                log.log(Level.INFO, "post- login: " + userId);
+                // 302 리다이렉션
+                sendRedirect(dos, "/index.html");
 
                 // 회원가입 후 index.html 반환
-                File indexFile = new File(WEB_ROOT + "/index.html");
-                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
+//                File indexFile = new File(WEB_ROOT + "/index.html");
+//                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
 
-                response200Header(dos, fileContent.length);
-                responseBody(dos, fileContent);
+//                response200Header(dos, fileContent.length);
+//                responseBody(dos, fileContent);
+
             }
 
             // 루드 경로 시 "/index.html"로 처리
@@ -90,7 +91,7 @@ public class RequestHandler implements Runnable{
                 path = "/index.html";
             }
 
-            // 파일 경로 설정
+             //파일 경로 설정
             File file = new File(WEB_ROOT + path);
             byte[] fileContent = Files.readAllBytes(file.toPath());
 
@@ -103,7 +104,7 @@ public class RequestHandler implements Runnable{
     }
 
     // URL 쿼리스트링 파싱 메서드
-    private Map<String, String> parseQueryParams(String path) throws UnsupportedEncodingException {
+    private Map<String, String> parseGETQueryParams(String path) throws UnsupportedEncodingException {
         Map<String, String> queryParams = new HashMap<>();
         if (path.contains("?")) {
             String[] parts = path.split("\\?");
@@ -119,12 +120,26 @@ public class RequestHandler implements Runnable{
         return queryParams;
     }
 
+    // 쿼리스트링 형식의 본문 데이터를 파싱하는 메소드
+    private Map<String, String> parsePOSTQueryParams(String queryString) throws UnsupportedEncodingException {
+        Map<String, String> queryParams = new HashMap<>();
+        String[] pairs = queryString.split("&");  // &로 각 key=value 쌍을 분리
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");  // =로 key와 value를 분리
+            if (keyValue.length > 1) {  // key=value 형식이 맞을 때만 처리
+                String key = URLDecoder.decode(keyValue[0], "UTF-8");
+                String value = URLDecoder.decode(keyValue[1], "UTF-8");
+                queryParams.put(key, value);  // Map에 key-value 쌍 저장
+            }
+        }
+        return queryParams;
+    }
+
+
     // POST 데이터 처리
     private Map<String, String> getPostData(BufferedReader br) throws IOException {
         String line;
         int contentLength = 0;
-
-        log.log(Level.INFO, "Reading headers...");
 
         // Content-Length 헤더를 통해 요청 본문 길이 추출
         while ((line = br.readLine()) != null && !line.isEmpty()) {
@@ -143,8 +158,19 @@ public class RequestHandler implements Runnable{
         log.log(Level.INFO, "본문 내용: " + new String(body, 0, bytesRead));
 
         // POST 데이터 파싱
-        return parseQueryParams(new String(body, 0, bytesRead));
+        return parsePOSTQueryParams(new String(body, 0, bytesRead));
     }
+
+    // POST 요청을 처리한 후, 클라이언트를 /index.html 로 리다이렉트
+    private void sendRedirect(DataOutputStream dos, String redirectUrl) throws IOException {
+        // 302 상태 코드와 Location 헤더 설정
+        dos.writeBytes("HTTP/1.1 302 Found\r\n");
+        dos.writeBytes("Location: " + redirectUrl + "\r\n");
+        dos.writeBytes("Content-Length: 0\r\n");
+        dos.writeBytes("Connection: close\r\n");
+        dos.writeBytes("\r\n");
+    }
+
 
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
