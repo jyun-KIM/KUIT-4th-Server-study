@@ -35,11 +35,13 @@ public class RequestHandler implements Runnable{
             String[] requestTokens = requestLine.split(" ");
             String method = requestTokens[0];
             String path = requestTokens[1]; // "/" or "/index.html"
+            log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
+
 
 
             // 회원가입 요청 처리
-            if (path.startsWith("/user/signup")) { //서버 경로로 설정해야함.
-                Map<String, String> queryParams = getQueryParams(path);
+            if (path.startsWith("/user/signup") && method.equals("GET")) { //서버 경로로 설정해야함
+                Map<String, String> queryParams = parseQueryParams(path);
 
                 // 사용자 정보를 메모리 리포지토리에 저장
                 String userId = queryParams.get("userId");
@@ -54,6 +56,26 @@ public class RequestHandler implements Runnable{
                     MemoryUserRepository.getInstance().addUser(newUser);
                     log.log(Level.INFO, "User registered: " + newUser);
                 }
+
+                // 회원가입 후 index.html 반환
+                File indexFile = new File(WEB_ROOT + "/index.html");
+                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
+
+                response200Header(dos, fileContent.length);
+                responseBody(dos, fileContent);
+            }
+
+            //POST 방식으로 로그인
+            if (method.equals("POST") && path.startsWith("/user/signup")) {
+                log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
+                log.log(Level.INFO, "ddddddd");
+                Map<String, String> postData = getPostData(br);
+
+                log.log(Level.INFO, "qqqqqqq");
+                String userId = postData.get("userId");
+                String password = postData.get("password");
+
+                log.log(Level.INFO, "post- login: " + userId);
 
                 // 회원가입 후 index.html 반환
                 File indexFile = new File(WEB_ROOT + "/index.html");
@@ -81,7 +103,7 @@ public class RequestHandler implements Runnable{
     }
 
     // URL 쿼리스트링 파싱 메서드
-    private Map<String, String> getQueryParams(String path) throws UnsupportedEncodingException {
+    private Map<String, String> parseQueryParams(String path) throws UnsupportedEncodingException {
         Map<String, String> queryParams = new HashMap<>();
         if (path.contains("?")) {
             String[] parts = path.split("\\?");
@@ -95,6 +117,33 @@ public class RequestHandler implements Runnable{
             }
         }
         return queryParams;
+    }
+
+    // POST 데이터 처리
+    private Map<String, String> getPostData(BufferedReader br) throws IOException {
+        String line;
+        int contentLength = 0;
+
+        log.log(Level.INFO, "Reading headers...");
+
+        // Content-Length 헤더를 통해 요청 본문 길이 추출
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+
+            // Content-Length 헤더 찾기
+            if (line.startsWith("Content-Length")) {
+                String[] contentLengthHeader = line.split(":");
+                contentLength = Integer.parseInt(contentLengthHeader[1].trim());
+                log.log(Level.INFO, "Content-Length: " + contentLength);
+            }
+        }
+
+        // Content-Length 만큼 본문 데이터 읽기
+        char[] body = new char[contentLength];  // 본문 데이터를 저장할 배열
+        int bytesRead = br.read(body, 0, contentLength);  // 본문 읽기
+        log.log(Level.INFO, "본문 내용: " + new String(body, 0, bytesRead));
+
+        // POST 데이터 파싱
+        return parseQueryParams(new String(body, 0, bytesRead));
     }
 
 
