@@ -1,4 +1,4 @@
-package webserver.controller;
+package controller;
 
 import db.MemoryUserRepository;
 import model.User;

@@ -1,4 +1,4 @@
-package webserver.controller;
+package controller;
 
 import webserver.Response;
 import webserver.Request;
