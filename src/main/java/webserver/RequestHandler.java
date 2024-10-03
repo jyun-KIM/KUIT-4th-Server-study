@@ -6,7 +6,6 @@ import model.User;
 import java.io.*;
 import java.net.Socket;
 import java.net.URLDecoder;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,7 +14,6 @@ import java.util.logging.Logger;
 public class RequestHandler implements Runnable{
     Socket connection;
     private static final Logger log = Logger.getLogger(RequestHandler.class.getName());
-    private static final String WEB_ROOT = "webapp";
     public RequestHandler(Socket connection) {
         this.connection = connection;
     } // 클라이언트와 연결된 소켓 객체 받음
@@ -29,14 +27,13 @@ public class RequestHandler implements Runnable{
             BufferedReader br = new BufferedReader(new InputStreamReader(in));
             DataOutputStream dos = new DataOutputStream(out);
 
-            // 첫 번째 요청 라인 처리- GET / HTTP/1.1 등
-            String requestLine = br.readLine();
-            if (requestLine == null) return;
+            Request request = Request.from(br);
+            Response response = new Response(dos);
 
             // 요청된 파일을 결정
-            String[] requestTokens = requestLine.split(" ");
-            String method = requestTokens[0];
-            String path = requestTokens[1]; // "/" or "/index.html"
+            String method = request.getMethod();
+            String path = request.getPath();
+
             log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
 
 
@@ -61,11 +58,10 @@ public class RequestHandler implements Runnable{
 
                 // 회원가입 후 index.html 반환
                 // responseBody 안에서 한번에 처리
-                File indexFile = new File(WEB_ROOT + "/index.html");
-                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
+//                File indexFile = new File(WEB_ROOT + "/index.html");
+//                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
 
-                response200Header(dos, path, fileContent.length);
-                responseBody(dos, fileContent);
+                response.forward(path);
             }
 
             //POST 방식으로 회원가입
@@ -85,7 +81,7 @@ public class RequestHandler implements Runnable{
                 log.log(Level.INFO, "유저ID: " + userId);
 
                 // 302 리다이렉션
-                sendRedirect(dos, "/index.html");
+                response.redirect("/index.html");
 
             }
 
@@ -107,7 +103,7 @@ public class RequestHandler implements Runnable{
                     addCookie(dos, "logined=true", "/index.html");
                 }else{
                     log.log(Level.INFO, "로그인 살패");
-                    sendRedirect(dos, "/user/login_failed.html");
+                    response.redirect("/user/login_failed.html");
                 }
             }
 
@@ -116,21 +112,16 @@ public class RequestHandler implements Runnable{
             if (method.equals(HttpMethod.GET.name()) && path.startsWith("/user/userList")) {
                 //Cookie[] cookies = request.getCookies();
 
-                sendRedirect(dos, "/user/list.html");
+                response.redirect("/user/list.html");
             }
 
             // 루드 경로 시 "/index.html"로 처리
             if (path.equals("/")) {
                 path = "/index.html";
-                sendRedirect(dos, "/index.html");
+                response.redirect("/index.html");
             }
 
-             //파일 경로 설정
-            File file = new File(WEB_ROOT + path);
-            byte[] fileContent = Files.readAllBytes(file.toPath());
-
-            response200Header(dos, path, fileContent.length);
-            responseBody(dos, fileContent);
+            response.forward(path);
 
         } catch (IOException e) {
             log.log(Level.SEVERE,e.getMessage());
@@ -196,19 +187,6 @@ public class RequestHandler implements Runnable{
         return queryParams;
     }
 
-
-    // POST 요청을 처리한 후, 클라이언트를 /index.html 로 리다이렉트
-    private void sendRedirect(DataOutputStream dos, String redirectUrl) throws IOException {
-        // 302 상태 코드와 Location 헤더 설정
-        log.log(Level.INFO, redirectUrl);
-        dos.writeBytes( HttpHeader.HTTP_302.getHeaderValue() + "\r\n");
-        dos.writeBytes(HttpHeader.LOCATION.getHeaderValue() + ": "+ redirectUrl + "\r\n");
-        dos.writeBytes("\r\n");
-        dos.writeBytes("Connection: close\r\n");
-        dos.writeBytes(HttpHeader.CONTENT_LENGTH.getHeaderValue() + ": 0\r\n");
-    }
-
-
     private void addCookie(DataOutputStream dos, String cookie, String redirectUrl) throws IOException {
         dos.writeBytes( HttpHeader.HTTP_302.getHeaderValue() + "\r\n");
         dos.writeBytes(HttpHeader.COOKIE.getHeaderValue() +": "+ cookie + "\r\n");
@@ -218,28 +196,5 @@ public class RequestHandler implements Runnable{
         dos.writeBytes("\r\n");
     }
 
-    private void response200Header(DataOutputStream dos, String path, int lengthOfBodyContent) {
-        try {
-            String contentType = "text/html";
-            if (path.endsWith(".css")) {
-                contentType = "text/css";
-            }
-            dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes(HttpHeader.CONTENT_TYPE.getHeaderValue() + ": " + contentType + ";charset=utf-8\r\n");
-            dos.writeBytes(HttpHeader.CONTENT_LENGTH.getHeaderValue() + ": " + lengthOfBodyContent + "\r\n");
-            dos.writeBytes("\r\n");
-        } catch (IOException e) {
-            log.log(Level.SEVERE, e.getMessage());
-        }
-    }
-
-    private void responseBody(DataOutputStream dos, byte[] body) {
-        try {
-            dos.write(body, 0, body.length);
-            dos.flush();
-        } catch (IOException e) {
-            log.log(Level.SEVERE, e.getMessage());
-        }
-    }
 
 }

@@ -8,7 +8,7 @@ public enum HttpHeader {
     CONNECTION("Connection"),
     HTTP_302("HTTP/1.1 302 Found");
 
-    private String headerValue;
+    private final String headerValue;
 
     HttpHeader(String headerValue) {
         this.headerValue = headerValue;
