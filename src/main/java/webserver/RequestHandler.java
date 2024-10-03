@@ -5,11 +5,13 @@ import model.User;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.file.Files;
-import java.util.Arrays;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,6 +23,8 @@ public class RequestHandler implements Runnable{
         this.connection = connection;
     } // 클라이언트와 연결된 소켓 객체 받음
 
+
+    // GET, POST 요청인지 확인해서 각각의 핸들 메서드 호출
     @Override
     public void run() {
         //log.log(Level.INFO, "New Client Connect! Connected IP : " + connection.getInetAddress() + ", Port : " + connection.getPort());
@@ -59,19 +63,28 @@ public class RequestHandler implements Runnable{
                 }
 
                 // 회원가입 후 index.html 반환
+                // responseBody 안에서 한번에 처리
                 File indexFile = new File(WEB_ROOT + "/index.html");
                 byte[] fileContent = Files.readAllBytes(indexFile.toPath());
 
-                response200Header(dos, fileContent.length);
+                response200Header(dos, path, fileContent.length);
                 responseBody(dos, fileContent);
             }
 
-            //POST 방식으로 로그인
+            //POST 방식으로 회원가입
             if (method.equals("POST") && path.startsWith("/user/signup")) {
                 log.log(Level.INFO, "경로: " + path);  // 경로 출력
                 Map<String, String> postData = getPostData(br);
 
                 String userId = postData.get("userId");
+                String password = postData.get("password");
+                String name = postData.get("name");
+                String email = postData.get("email");
+
+                User user = new User(userId, password, name, email);
+                MemoryUserRepository memoryUserRepository = MemoryUserRepository.getInstance();
+                memoryUserRepository.addUser(user);
+
                 log.log(Level.INFO, "유저ID: " + userId);
 
                 // 302 리다이렉션
@@ -86,53 +99,51 @@ public class RequestHandler implements Runnable{
 
             }
 
+            if (method.equals("POST") && path.startsWith("/user/login")) {
+                Map<String, String> postData = getPostData(br);
+
+                String userId = postData.get("userId");
+                String password = postData.get("password");
+
+                log.log(Level.INFO, "유저ID: " + userId);
+                log.log(Level.INFO, "유저password: " + password);
+
+
+                MemoryUserRepository memoryUserRepository = MemoryUserRepository.getInstance();
+                User user = memoryUserRepository.findUserById(userId); //findUser 여기서 user 받기
+
+                if(user.getPassword().equals(password)) {
+                    log.log(Level.INFO, "로그인 성공!");
+                    addCookie(dos, "logined=true", "/index.html");
+                }else{
+                    log.log(Level.INFO, "로그인 살패");
+                    sendRedirect(dos, "/user/login_failed.html");
+                }
+            }
+
+
+            if (method.equals("GET") && path.startsWith("/user/userList")) {
+                //Cookie[] cookies = request.getCookies();
+
+                sendRedirect(dos, "/user/list.html");
+            }
+
             // 루드 경로 시 "/index.html"로 처리
             if (path.equals("/")) {
                 path = "/index.html";
+                sendRedirect(dos, "/index.html");
             }
 
              //파일 경로 설정
             File file = new File(WEB_ROOT + path);
             byte[] fileContent = Files.readAllBytes(file.toPath());
 
-            response200Header(dos, fileContent.length);
+            response200Header(dos, path, fileContent.length);
             responseBody(dos, fileContent);
 
         } catch (IOException e) {
             log.log(Level.SEVERE,e.getMessage());
         }
-    }
-
-    // URL 쿼리스트링 파싱 메서드
-    private Map<String, String> parseGETQueryParams(String path) throws UnsupportedEncodingException {
-        Map<String, String> queryParams = new HashMap<>();
-        if (path.contains("?")) {
-            String[] parts = path.split("\\?");
-            String queryString = parts[1];
-            String[] pairs = queryString.split("&");
-            for (String pair : pairs) {
-                String[] keyValue = pair.split("=");
-                String key = URLDecoder.decode(keyValue[0], "UTF-8");
-                String value = URLDecoder.decode(keyValue[1], "UTF-8");
-                queryParams.put(key, value);
-            }
-        }
-        return queryParams;
-    }
-
-    // 쿼리스트링 형식의 본문 데이터를 파싱하는 메소드
-    private Map<String, String> parsePOSTQueryParams(String queryString) throws UnsupportedEncodingException {
-        Map<String, String> queryParams = new HashMap<>();
-        String[] pairs = queryString.split("&");  // &로 각 key=value 쌍을 분리
-        for (String pair : pairs) {
-            String[] keyValue = pair.split("=");  // =로 key와 value를 분리
-            if (keyValue.length > 1) {  // key=value 형식이 맞을 때만 처리
-                String key = URLDecoder.decode(keyValue[0], "UTF-8");
-                String value = URLDecoder.decode(keyValue[1], "UTF-8");
-                queryParams.put(key, value);  // Map에 key-value 쌍 저장
-            }
-        }
-        return queryParams;
     }
 
 
@@ -161,9 +172,44 @@ public class RequestHandler implements Runnable{
         return parsePOSTQueryParams(new String(body, 0, bytesRead));
     }
 
+
+    // GET 파싱메서드
+    private Map<String, String> parseGETQueryParams(String path) throws UnsupportedEncodingException {
+        Map<String, String> queryParams = new HashMap<>();
+        if (path.contains("?")) {
+            String[] parts = path.split("\\?");
+            String queryString = parts[1];
+            String[] pairs = queryString.split("&");
+            for (String pair : pairs) {
+                String[] keyValue = pair.split("=");
+                String key = URLDecoder.decode(keyValue[0], "UTF-8");
+                String value = URLDecoder.decode(keyValue[1], "UTF-8");
+                queryParams.put(key, value);
+            }
+        }
+        return queryParams;
+    }
+
+    // POST 파싱메서드
+    private Map<String, String> parsePOSTQueryParams(String queryString) throws UnsupportedEncodingException {
+        Map<String, String> queryParams = new HashMap<>();
+        String[] pairs = queryString.split("&");  // &로 각 key=value 쌍을 분리
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");  // =로 key와 value를 분리
+            if (keyValue.length > 1) {  // key=value 형식이 맞을 때만 처리
+                String key = URLDecoder.decode(keyValue[0], "UTF-8");
+                String value = URLDecoder.decode(keyValue[1], "UTF-8");
+                queryParams.put(key, value);  // Map에 key-value 쌍 저장
+            }
+        }
+        return queryParams;
+    }
+
+
     // POST 요청을 처리한 후, 클라이언트를 /index.html 로 리다이렉트
     private void sendRedirect(DataOutputStream dos, String redirectUrl) throws IOException {
         // 302 상태 코드와 Location 헤더 설정
+        log.log(Level.INFO, redirectUrl);
         dos.writeBytes("HTTP/1.1 302 Found\r\n");
         dos.writeBytes("Location: " + redirectUrl + "\r\n");
         dos.writeBytes("Content-Length: 0\r\n");
@@ -172,11 +218,23 @@ public class RequestHandler implements Runnable{
     }
 
 
+    private void addCookie(DataOutputStream dos, String cookie, String redirectUrl) throws IOException {
+        dos.writeBytes("HTTP/1.1 302 Found\r\n");
+        dos.writeBytes("Cookie: " + cookie + "\r\n");
+        dos.writeBytes("Location: " + redirectUrl + "\r\n");
+        dos.writeBytes("Content-Length: 0\r\n");
+        dos.writeBytes("Connection: close\r\n");
+        dos.writeBytes("\r\n");
+    }
 
-    private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
+    private void response200Header(DataOutputStream dos, String path, int lengthOfBodyContent) {
         try {
+            String contentType = "text/html";
+            if (path.endsWith(".css")) {
+                contentType = "text/css";
+            }
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Content-Type: " + contentType + ";charset=utf-8\r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
