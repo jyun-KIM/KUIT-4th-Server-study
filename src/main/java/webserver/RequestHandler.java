@@ -5,13 +5,10 @@ import model.User;
 
 import java.io.*;
 import java.net.Socket;
-import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.file.Files;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -45,14 +42,14 @@ public class RequestHandler implements Runnable{
 
 
             // GET 방식으로 회원가입 요청 처리
-            if (path.startsWith("/user/signup") && method.equals("GET")) { //서버 경로로 설정해야함
+            if (method.equals(HttpMethod.GET.name()) && path.startsWith("/user/signup")) { //서버 경로로 설정해야함
                 Map<String, String> queryParams = parseGETQueryParams(path);
 
                 // 사용자 정보 저장
-                String userId = queryParams.get("userId");
-                String password = queryParams.get("password");
-                String name = queryParams.get("name");
-                String email = queryParams.get("email");
+                String userId = queryParams.get(UserQueryKey.USER_ID.getKey());
+                String password = queryParams.get(UserQueryKey.PASSWORD.getKey());
+                String name = queryParams.get(UserQueryKey.NAME.getKey());
+                String email = queryParams.get(UserQueryKey.EMAIL.getKey());
 
                 log.log(Level.INFO, "사용자 정보: " + method + " " + path + " " + userId);
 
@@ -72,14 +69,14 @@ public class RequestHandler implements Runnable{
             }
 
             //POST 방식으로 회원가입
-            if (method.equals("POST") && path.startsWith("/user/signup")) {
+            if (method.equals(HttpMethod.POST.name()) && path.startsWith("/user/signup")) {
                 log.log(Level.INFO, "경로: " + path);  // 경로 출력
                 Map<String, String> postData = getPostData(br);
 
-                String userId = postData.get("userId");
-                String password = postData.get("password");
-                String name = postData.get("name");
-                String email = postData.get("email");
+                String userId = postData.get(UserQueryKey.USER_ID.getKey());
+                String password = postData.get(UserQueryKey.PASSWORD.getKey());
+                String name = postData.get(UserQueryKey.NAME.getKey());
+                String email = postData.get(UserQueryKey.EMAIL.getKey());
 
                 User user = new User(userId, password, name, email);
                 MemoryUserRepository memoryUserRepository = MemoryUserRepository.getInstance();
@@ -90,20 +87,13 @@ public class RequestHandler implements Runnable{
                 // 302 리다이렉션
                 sendRedirect(dos, "/index.html");
 
-                // 회원가입 후 index.html 반환
-//                File indexFile = new File(WEB_ROOT + "/index.html");
-//                byte[] fileContent = Files.readAllBytes(indexFile.toPath());
-
-//                response200Header(dos, fileContent.length);
-//                responseBody(dos, fileContent);
-
             }
 
-            if (method.equals("POST") && path.startsWith("/user/login")) {
+            if (method.equals(HttpMethod.POST.name()) && path.startsWith("/user/login")) {
                 Map<String, String> postData = getPostData(br);
 
-                String userId = postData.get("userId");
-                String password = postData.get("password");
+                String userId = postData.get(UserQueryKey.USER_ID.getKey());
+                String password = postData.get(UserQueryKey.PASSWORD.getKey());
 
                 log.log(Level.INFO, "유저ID: " + userId);
                 log.log(Level.INFO, "유저password: " + password);
@@ -122,7 +112,8 @@ public class RequestHandler implements Runnable{
             }
 
 
-            if (method.equals("GET") && path.startsWith("/user/userList")) {
+            // cookie 확인 후 userList 띄우기
+            if (method.equals(HttpMethod.GET.name()) && path.startsWith("/user/userList")) {
                 //Cookie[] cookies = request.getCookies();
 
                 sendRedirect(dos, "/user/list.html");
@@ -210,19 +201,19 @@ public class RequestHandler implements Runnable{
     private void sendRedirect(DataOutputStream dos, String redirectUrl) throws IOException {
         // 302 상태 코드와 Location 헤더 설정
         log.log(Level.INFO, redirectUrl);
-        dos.writeBytes("HTTP/1.1 302 Found\r\n");
-        dos.writeBytes("Location: " + redirectUrl + "\r\n");
-        dos.writeBytes("Content-Length: 0\r\n");
-        dos.writeBytes("Connection: close\r\n");
+        dos.writeBytes( HttpHeader.HTTP_302.getHeaderValue() + "\r\n");
+        dos.writeBytes(HttpHeader.LOCATION.getHeaderValue() + ": "+ redirectUrl + "\r\n");
         dos.writeBytes("\r\n");
+        dos.writeBytes("Connection: close\r\n");
+        dos.writeBytes(HttpHeader.CONTENT_LENGTH.getHeaderValue() + ": 0\r\n");
     }
 
 
     private void addCookie(DataOutputStream dos, String cookie, String redirectUrl) throws IOException {
-        dos.writeBytes("HTTP/1.1 302 Found\r\n");
-        dos.writeBytes("Cookie: " + cookie + "\r\n");
-        dos.writeBytes("Location: " + redirectUrl + "\r\n");
-        dos.writeBytes("Content-Length: 0\r\n");
+        dos.writeBytes( HttpHeader.HTTP_302.getHeaderValue() + "\r\n");
+        dos.writeBytes(HttpHeader.COOKIE.getHeaderValue() +": "+ cookie + "\r\n");
+        dos.writeBytes(HttpHeader.LOCATION.getHeaderValue() + ": " + redirectUrl + "\r\n");
+        dos.writeBytes(HttpHeader.CONTENT_LENGTH.getHeaderValue() + ": 0\r\n");
         dos.writeBytes("Connection: close\r\n");
         dos.writeBytes("\r\n");
     }
@@ -234,8 +225,8 @@ public class RequestHandler implements Runnable{
                 contentType = "text/css";
             }
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: " + contentType + ";charset=utf-8\r\n");
-            dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            dos.writeBytes(HttpHeader.CONTENT_TYPE.getHeaderValue() + ": " + contentType + ";charset=utf-8\r\n");
+            dos.writeBytes(HttpHeader.CONTENT_LENGTH.getHeaderValue() + ": " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
             log.log(Level.SEVERE, e.getMessage());
