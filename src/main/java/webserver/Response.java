@@ -1,10 +1,7 @@
 package webserver;
 
 import java.io.*;
-import java.net.URLDecoder;
 import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,25 +38,6 @@ public class Response {
         dos.writeBytes("\r\n");
     }
 
-//    public void redirect(String path) throws IOException {
-//        // 302 상태 코드와 Location 헤더 설정
-//        log.log(Level.INFO, "Redirecting to: " + path);
-//
-//        // 상태 코드 및 헤더 출력
-//        dos.writeBytes("HTTP/1.1 302 Found\r\n");  // 302 상태 코드
-//        dos.writeBytes("Location: " + path + "\r\n");  // 리다이렉트할 경로
-//        dos.writeBytes("Content-Length: 0\r\n");  // 본문 없음, 길이 0
-//        dos.writeBytes("Connection: close\r\n");  // 연결 종료
-//
-//        // 헤더 끝을 알리는 빈 줄
-//        dos.writeBytes("\r\n");
-//
-//        // 스트림을 플러시하여 데이터를 즉시 전송
-//        dos.flush();
-//    }
-
-
-
     private void response200Header(DataOutputStream dos, String path, int lengthOfBodyContent) {
         try {
             String contentType = "text/html";
@@ -84,13 +62,9 @@ public class Response {
         }
     }
 
-
-// 쿠키를 추가하는 메서드
     public void addCookie(String cookie) throws IOException {
-//        log.log(Level.INFO, path);
         dos.writeBytes( HttpHeader.HTTP_302.getHeaderValue() + "\r\n");
         dos.writeBytes("Set-Cookie: " + cookie + "; Path=/; HttpOnly\r\n");
     }
-
 
 }

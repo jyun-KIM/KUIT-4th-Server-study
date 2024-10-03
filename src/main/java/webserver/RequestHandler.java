@@ -9,7 +9,6 @@ import java.util.logging.Logger;
 public class RequestHandler implements Runnable{
     Socket connection;
     private static final Logger log = Logger.getLogger(RequestHandler.class.getName());
-//    log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
 
     public RequestHandler(Socket connection) {
         this.connection = connection;
@@ -30,9 +29,6 @@ public class RequestHandler implements Runnable{
             // 요청된 파일을 결정
             String method = request.getMethod();
             String path = request.getPath();
-
-            log.log(Level.INFO, "Parsed Path: " + path);  // 경로 출력
-
 
             // GET 방식으로 회원가입 요청 처리
             if (path.startsWith("/user/signup")) { //서버 경로로 설정해야함
