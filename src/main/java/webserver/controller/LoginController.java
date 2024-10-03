@@ -5,7 +5,6 @@ import model.User;
 import webserver.*;
 import java.io.IOException;
 import java.util.Map;
-import java.util.logging.Logger;
 
 public class LoginController implements Controller{
     @Override
